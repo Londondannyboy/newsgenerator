@@ -7,8 +7,8 @@ Retrieves article data from Neon database.
 from temporalio import activity
 from typing import Dict, Any, List
 import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import psycopg
+from psycopg.rows import dict_row
 
 from src.config.config import config
 
@@ -38,8 +38,8 @@ async def get_recent_articles_from_neon(
 
     conn = None
     try:
-        conn = psycopg2.connect(config.DATABASE_URL)
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        conn = psycopg.connect(config.DATABASE_URL)
+        with conn.cursor(row_factory=dict_row) as cur:
             # Query recent articles
             query = """
                 SELECT
@@ -58,11 +58,10 @@ async def get_recent_articles_from_neon(
 
             activity.logger.info(f"✅ Found {len(articles)} recent articles for {app}")
 
-            # Convert to dict list
-            result = [dict(row) for row in articles]
-            return result
+            # Already dicts with dict_row
+            return list(articles)
 
-    except psycopg2.OperationalError as e:
+    except psycopg.OperationalError as e:
         activity.logger.warning(f"⚠️ Database connection failed - continuing without recent articles: {e}")
         return []
     except Exception as e:
