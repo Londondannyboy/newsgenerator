@@ -13,7 +13,7 @@ anthropic>=0.40.0
 pydantic>=2.0.0
 
 # Database - PostgreSQL/Neon for article context
-psycopg[binary]>=3.1.0
+psycopg2-binary>=2.9.9
 
 # Knowledge Graph - Zep for duplicate detection
 zep-cloud>=2.0.0
