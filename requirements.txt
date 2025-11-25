@@ -1,0 +1,39 @@
+# Temporal & Workflow
+temporalio>=1.7.0
+
+# Google/gRPC dependencies - pin compatible versions to avoid resolution conflicts
+grpcio>=1.62.0,<2.0.0
+grpcio-status>=1.62.0,<2.0.0
+proto-plus>=1.24.0,<2.0.0
+protobuf>=4.25.0,<6.0.0
+googleapis-common-protos>=1.63.0,<2.0.0
+
+# AI/ML - Anthropic for news assessment and prompt building
+anthropic>=0.40.0
+pydantic>=2.0.0
+
+# Database - PostgreSQL/Neon for article context
+psycopg[binary]>=3.1.0
+
+# Knowledge Graph - Zep for duplicate detection
+zep-cloud>=2.0.0
+
+# Web Requests
+httpx>=0.27.0
+aiohttp>=3.9.0
+
+# Parsing
+beautifulsoup4>=4.12.0
+
+# Utilities
+python-dotenv>=1.0.0
+structlog>=24.1.0
+ulid-py>=1.1.0
+slugify>=0.0.1
+python-slugify>=8.0.0
+
+# URL handling
+urllib3>=2.0.0
+validators>=0.22.0
+
+# Force rebuild - 2025-11-25
