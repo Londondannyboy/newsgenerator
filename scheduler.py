@@ -7,13 +7,11 @@ Runs NewsCreationWorkflow on a schedule for each configured app.
 
 import asyncio
 import sys
-from datetime import datetime
-from temporalio.client import Client
-from temporalio.api.enums.v1 import ScheduleOverlapPolicy
-from temporalio.service import ScheduleService
+from datetime import datetime, timedelta
+from temporalio.client import Client, Schedule, ScheduleActionStartWorkflow, ScheduleSpec, ScheduleCalendarSpec, ScheduleRange, ScheduleOverlapPolicy, SchedulePolicy
 
 from dotenv import load_dotenv
-from src.utils.config import config
+from src.config.config import config
 from src.workflows.news_creation import NewsCreationWorkflow
 
 # Load environment variables
@@ -43,30 +41,33 @@ async def create_schedule(client: Client, app: str, app_display_name: str) -> No
     print(f"📅 Creating schedule '{schedule_id}' for {app_display_name}...")
 
     try:
-        from temporalio.client import ScheduleDescription, ScheduleSpec, ScheduleAction, StartWorkflowAction
-
         # Create schedule that runs daily at 9 AM UTC
         await client.create_schedule(
             schedule_id,
-            ScheduleDescription(
-                schedule=ScheduleSpec(
-                    cron="0 9 * * *"  # Daily at 9 AM UTC
-                ),
-                action=StartWorkflowAction(
-                    workflow_type=NewsCreationWorkflow,
-                    input=[
-                        {
-                            "app": app,
-                            "min_relevance_score": 0.7,
-                            "auto_create_articles": True,
-                            "max_articles_to_create": 3
-                        }
-                    ],
+            Schedule(
+                action=ScheduleActionStartWorkflow(
+                    NewsCreationWorkflow.run,
+                    {
+                        "app": app,
+                        "min_relevance_score": 0.7,
+                        "auto_create_articles": True,
+                        "max_articles_to_create": 3
+                    },
+                    id=f"news-creation-{app}-scheduled",
                     task_queue=config.TEMPORAL_TASK_QUEUE,
-                    workflow_id_reuse_policy=1  # Allow reuse
-                )
+                ),
+                spec=ScheduleSpec(
+                    calendars=[
+                        ScheduleCalendarSpec(
+                            hour=[ScheduleRange(9)],  # 9 AM UTC
+                            minute=[ScheduleRange(0)],
+                        )
+                    ]
+                ),
+                policy=SchedulePolicy(
+                    overlap=ScheduleOverlapPolicy.SKIP,
+                ),
             ),
-            overlap_policy=ScheduleOverlapPolicy.SKIP
         )
 
         print(f"✅ Created schedule '{schedule_id}' - runs daily at 9 AM UTC")
@@ -147,7 +148,7 @@ async def main():
     print(f"   - relocation: Daily at 9 AM UTC")
     print(f"\n   To view schedules: railway logs --service news-generator")
 
-    await client.close()
+    # Client cleanup happens automatically when script exits
 
 
 if __name__ == "__main__":
