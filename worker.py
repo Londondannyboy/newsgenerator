@@ -23,20 +23,8 @@ from src.activities.dataforseo import dataforseo_news_search
 from src.activities.serper import serper_news_search
 from src.activities.news_assessment import assess_news_batch
 from src.activities.intelligent_prompt_builder import build_intelligent_video_prompt
-
-# Optional imports - graceful failure if not available
-get_recent_articles_from_neon = None
-query_zep_for_context = None
-
-try:
-    from src.activities.neon_articles import get_recent_articles_from_neon
-except ImportError:
-    pass
-
-try:
-    from src.activities.zep_integration import query_zep_for_context
-except ImportError:
-    pass
+from src.activities.neon_articles import get_recent_articles_from_neon
+from src.activities.zep_integration import query_zep_for_context
 
 from src.config.config import config
 
@@ -103,30 +91,23 @@ async def main():
         sys.exit(1)
 
     # Create worker with workflow and activities
-    # Only include activities that are available
-    activities = [
-        # News Research
-        dataforseo_news_search,
-        serper_news_search,
-
-        # Assessment & Context
-        assess_news_batch,
-
-        # Media Generation
-        build_intelligent_video_prompt
-    ]
-
-    # Add optional activities if available
-    if get_recent_articles_from_neon:
-        activities.append(get_recent_articles_from_neon)
-    if query_zep_for_context:
-        activities.append(query_zep_for_context)
-
     worker = Worker(
         client,
         task_queue=config.TEMPORAL_TASK_QUEUE,
         workflows=[NewsCreationWorkflow],
-        activities=activities,
+        activities=[
+            # News Research
+            dataforseo_news_search,
+            serper_news_search,
+
+            # Assessment & Context
+            assess_news_batch,
+            get_recent_articles_from_neon,
+            query_zep_for_context,
+
+            # Media Generation
+            build_intelligent_video_prompt
+        ],
     )
 
     print("\n" + "=" * 70)
