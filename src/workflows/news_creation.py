@@ -181,11 +181,12 @@ class NewsCreationWorkflow:
             f"low={assessment_result.get('total_low_priority', 0)})"
         )
 
-        # ===== PHASE 4: CREATE ARTICLES =====
-        articles_created = []
+        # ===== PHASE 4: PREPARE STORIES FOR ARTICLE CREATION =====
+        # News-generator finds and assesses news - article creation happens in Quest content-worker
+        stories_ready = []
 
-        if auto_create and relevant_stories:
-            workflow.logger.info(f"Phase 4: Creating articles for top {max_articles} stories")
+        if relevant_stories:
+            workflow.logger.info(f"Phase 4: Preparing top {max_articles} stories for article creation")
 
             # Sort by priority and relevance
             sorted_stories = sorted(
@@ -196,104 +197,35 @@ class NewsCreationWorkflow:
                 )
             )
 
-            # Create articles for top stories
+            # Prepare stories for article creation (by Quest content-worker)
             for story_assessment in sorted_stories[:max_articles]:
                 story = story_assessment.get("story", {})
                 priority = story_assessment.get("priority", "medium")
                 story_title = story.get("title", "")
 
-                workflow.logger.info(f"Creating article: {story_title[:50]}...")
+                workflow.logger.info(f"📰 Ready for article: [{priority.upper()}] {story_title[:60]}...")
 
-                # ===== PHASE 3.5: CHECK ZEP FOR EXISTING COVERAGE =====
-                # Query Zep to see if this story already exists
-                zep_check = await workflow.execute_activity(
-                    "query_zep_for_context",
-                    args=[story_title, "", app],  # Story title as company_name, empty domain
-                    start_to_close_timeout=timedelta(seconds=30)
-                )
-
-                existing_articles = zep_check.get("articles", [])
-
-                if existing_articles:
-                    # Check if it's a recent duplicate or old developing story
-                    most_recent = existing_articles[0] if existing_articles else None
-                    if most_recent:
-                        recent_timestamp = most_recent.get("created_at") or most_recent.get("timestamp", "")
-                        story_timestamp = story.get("timestamp", story.get("time_published", ""))
-
-                        # Simple time check: if both from today, skip as duplicate
-                        # In real implementation, would parse timestamps properly
-                        if recent_timestamp and story_timestamp:
-                            # Skip if both are from same date (avoid republishing same day)
-                            if recent_timestamp[:10] == story_timestamp[:10]:  # Compare YYYY-MM-DD
-                                workflow.logger.info(f"⏭️  SKIP: Recent duplicate - {story_title[:50]}...")
-                                continue
-                            else:
-                                # Old story but same topic - reference it as ongoing saga
-                                workflow.logger.info(
-                                    f"📰 REFERENCE: Developing story - {story_title[:50]}... "
-                                    f"(Previous coverage: {most_recent.get('title', '')})"
-                                )
-
-                # ===== BUILD INTELLIGENT VIDEO PROMPT =====
-                # Generate contextual, creative prompt based on story and published articles
-                prompt_result = await workflow.execute_activity(
-                    "build_intelligent_video_prompt",
-                    args=[
-                        story.get("title", ""),  # Topic
-                        story.get("description", story.get("snippet", ""))[:500],  # Content preview
-                        app,  # App context
-                        recent_articles[:5],  # Learn from recent articles
-                        None,  # App config (will use defaults)
-                        "seedance"  # Video model
-                    ],
-                    start_to_close_timeout=timedelta(seconds=30)
-                )
-
-                video_prompt = prompt_result.get("prompt")
-                workflow.logger.info(f"Generated video prompt: {video_prompt[:80]}...")
-
-                # ===== BUILD ARTICLE INPUT WITH VIDEO-FIRST CONFIGURATION =====
-                article_input = {
-                    "topic": story.get("title", ""),
-                    "article_type": "news",
+                stories_ready.append({
+                    "title": story.get("title"),
+                    "url": story.get("url"),
+                    "source": story.get("source"),
+                    "description": story.get("description", story.get("snippet", "")),
+                    "timestamp": story.get("timestamp", story.get("time_published", "")),
+                    "priority": priority,
+                    "relevance_score": story_assessment.get("relevance_score", 0),
+                    "reasoning": story_assessment.get("reasoning", ""),
                     "app": app,
-                    "target_word_count": 1500,
-                    "jurisdiction": geographic_focus[0] if geographic_focus else "UK",
-                    "generate_images": True,
-                    "video_quality": "medium" if priority in ["high", "medium"] else None,  # High/medium priority get videos
-                    "video_model": "seedance",
-                    "video_prompt": video_prompt,  # Intelligent, contextual prompt
-                    "content_images": "with_content",
-                    "num_research_sources": 10
-                }
+                    "suggested_article_type": "news",
+                    "suggested_jurisdiction": geographic_focus[0] if geographic_focus else "UK"
+                })
 
-                # Spawn child workflow with video-first configuration
-                try:
-                    result = await workflow.execute_child_workflow(
-                        "ArticleCreationWorkflow",
-                        article_input,
-                        id=f"article-{app}-{workflow.uuid4().hex[:8]}",
-                        task_queue=workflow.info().task_queue
-                    )
-
-                    articles_created.append({
-                        "title": story.get("title"),
-                        "article_id": result.get("article_id"),
-                        "slug": result.get("slug"),
-                        "priority": story_assessment.get("priority")
-                    })
-
-                    workflow.logger.info(f"Article created: {result.get('slug')}")
-
-                except Exception as e:
-                    workflow.logger.error(f"Failed to create article: {str(e)}")
+            workflow.logger.info(f"✅ {len(stories_ready)} stories ready for article creation")
 
         # ===== COMPLETE =====
         workflow.logger.info(
             f"News Monitor complete for {app}: "
             f"{len(stories)} found, {len(relevant_stories)} relevant, "
-            f"{len(articles_created)} created"
+            f"{len(stories_ready)} ready for articles"
         )
 
         return {
@@ -302,8 +234,8 @@ class NewsCreationWorkflow:
             "stories_found": len(stories),
             "stories_assessed": assessment_result.get("stories_assessed", 0),
             "stories_relevant": len(relevant_stories),
-            "articles_created": len(articles_created),
-            "articles": articles_created,
+            "stories_ready_for_articles": len(stories_ready),
+            "stories": stories_ready,  # Full story data for downstream processing
             "high_priority_count": assessment_result.get("total_high_priority", 0),
             "medium_priority_count": assessment_result.get("total_medium_priority", 0),
             "low_priority_count": assessment_result.get("total_low_priority", 0),
