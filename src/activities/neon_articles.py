@@ -1,22 +1,14 @@
 """
 Neon Database Activities for Articles
 
-Retrieves article data from Neon database (graceful if psycopg2 not available).
+Retrieves article data from Neon database.
 """
 
 from temporalio import activity
 from typing import Dict, Any, List
 import os
-
-# Optional psycopg2 import - graceful failure if not available
-psycopg2 = None
-RealDictCursor = None
-
-try:
-    import psycopg2
-    from psycopg2.extras import RealDictCursor
-except ImportError:
-    pass
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 from src.config.config import config
 
@@ -41,11 +33,7 @@ async def get_recent_articles_from_neon(
     activity.logger.info(f"Fetching recent articles for {app} from last {days} days (limit {limit})")
 
     if not config.DATABASE_URL:
-        activity.logger.warning("DATABASE_URL not configured - returning empty list")
-        return []
-
-    if not psycopg2:
-        activity.logger.warning("⚠️ psycopg2 not installed - returning empty list (graceful failure)")
+        activity.logger.warning("DATABASE_URL not configured")
         return []
 
     conn = None
