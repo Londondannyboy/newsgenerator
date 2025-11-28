@@ -20,7 +20,7 @@ class Config:
     TEMPORAL_ADDRESS: str = os.getenv("TEMPORAL_ADDRESS", "localhost:7233")
     TEMPORAL_NAMESPACE: str = os.getenv("TEMPORAL_NAMESPACE", "default")
     TEMPORAL_API_KEY: Optional[str] = os.getenv("TEMPORAL_API_KEY")
-    TEMPORAL_TASK_QUEUE: str = os.getenv("TEMPORAL_TASK_QUEUE", "quest-content-queue")
+    TEMPORAL_TASK_QUEUE: str = os.getenv("TEMPORAL_TASK_QUEUE", "quest-news-queue")
 
     # ===== DATABASE =====
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")

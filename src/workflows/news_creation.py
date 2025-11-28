@@ -269,12 +269,13 @@ class NewsCreationWorkflow:
                 }
 
                 # Spawn child workflow with video-first configuration
+                # Child runs on content-worker queue (has all activities)
                 try:
                     result = await workflow.execute_child_workflow(
                         "ArticleCreationWorkflow",
                         article_input,
                         id=f"article-{app}-{workflow.uuid4().hex[:8]}",
-                        task_queue=workflow.info().task_queue
+                        task_queue="quest-content-queue"  # Target content-worker
                     )
 
                     articles_created.append({
